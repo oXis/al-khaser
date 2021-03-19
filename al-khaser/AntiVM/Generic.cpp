@@ -41,6 +41,308 @@ VOID loaded_dlls()
 			print_results(TRUE, msg);
 	}
 }
+
+/*
+Check if the file name contains any of the following strings.
+This is likely an automated malware sandbox.
+*/
+VOID known_file_names() {
+
+	/* Array of strings of filenames seen in sandboxes */
+	CONST TCHAR* szFilenames[] = {
+		_T("sample.exe"),
+		_T("bot.exe"),		
+		_T("sandbox.exe"),		
+		_T("malware.exe"),	
+		_T("test.exe"),	
+		_T("klavme.exe"),		
+		_T("myapp.exe"),
+		_T("testapp.exe"),
+
+	};
+
+#if defined (ENV64BIT)
+	PPEB pPeb = (PPEB)__readgsqword(0x60);
+
+#elif defined(ENV32BIT)
+	PPEB pPeb = (PPEB)__readfsdword(0x30);
+#endif
+
+	if (!pPeb->ProcessParameters->ImagePathName.Buffer) {
+		return;
+	}
+
+	// Get the file name from path/
+	WCHAR* szFileName = PathFindFileNameW(pPeb->ProcessParameters->ImagePathName.Buffer);
+	
+	TCHAR msg[256] = _T("");
+	WORD dwlength = sizeof(szFilenames) / sizeof(szFilenames[0]);
+	for (int i = 0; i < dwlength; i++)
+	{
+		_stprintf_s(msg, sizeof(msg) / sizeof(TCHAR), _T("Checking if process file name contains: %s "), szFilenames[i]);
+
+		/* Check if file name matches any blacklisted filenames */
+		if (StrCmpIW(szFilenames[i], szFileName) != 0)
+			print_results(FALSE, msg);
+		else
+			print_results(TRUE, msg);
+	}
+
+	// Some malware do check if the file name is a known hash (like md5 or sha1)
+	PathRemoveExtensionW(szFileName);
+	_stprintf_s(msg, sizeof(msg) / sizeof(TCHAR), _T("Checking if process file name looks like a hash: %s "), szFileName);
+	if ( (wcslen(szFileName) == 32 || wcslen(szFileName) == 40 || wcslen(szFileName) == 64) && IsHexString(szFileName))
+		print_results(TRUE, msg);
+	else 
+		print_results(FALSE, msg);
+}
+
+static TCHAR * get_username() {
+	TCHAR *username;
+	DWORD nSize = (UNLEN + 1);
+
+	username = (TCHAR *) malloc(nSize * sizeof(TCHAR));
+	if (!username) {
+		return NULL;
+	}
+	if (0 == GetUserName(username, &nSize)) {
+		free(username);
+		return NULL;
+	}
+	return username;
+}
+
+/*
+Check for usernames associated with sandboxes
+*/
+VOID known_usernames() {
+
+	/* Array of strings of usernames seen in sandboxes */
+	CONST TCHAR* szUsernames[] = {
+		/* Checked for by Gootkit
+		 * https://www.sentinelone.com/blog/gootkit-banking-trojan-deep-dive-anti-analysis-features/ */
+		_T("CurrentUser"),
+		_T("Sandbox"),
+
+		/* Checked for by ostap
+		 * https://www.bromium.com/deobfuscating-ostap-trickbots-javascript-downloader/ */
+		_T("Emily"),
+		_T("HAPUBWS"),
+		_T("Hong Lee"),
+		_T("IT-ADMIN"),
+		_T("Johnson"), /* Lastline Sandbox */
+		_T("Miller"), /* Lastline Sandbox */
+		_T("milozs"),
+		_T("Peter Wilson"),
+		_T("timmy"),
+		_T("user"),
+
+		/* Checked for by Betabot (not including ones from above)
+		 * https://www.bromium.com/deobfuscating-ostap-trickbots-javascript-downloader/ */
+		_T("sand box"),
+		_T("malware"),
+		_T("maltest"),
+		_T("test user"),
+
+		/* Checked for by Satan (not including ones from above)
+		 * https://cofense.com/satan/ */
+		_T("virus"),
+
+		/* Checked for by Emotet (not including ones from above)
+		 * https://blog.trendmicro.com/trendlabs-security-intelligence/new-emotet-hijacks-windows-api-evades-sandbox-analysis/ */
+		_T("John Doe"), /* VirusTotal Cuckoofork Sandbox */
+	};
+	TCHAR *username;
+
+	if (NULL == (username = get_username())) {
+		return;
+	}
+
+	TCHAR msg[256];
+	WORD dwlength = sizeof(szUsernames) / sizeof(szUsernames[0]);
+	for (int i = 0; i < dwlength; i++) {
+
+		_stprintf_s(msg, sizeof(msg) / sizeof(msg[0]), _T("Checking if username matches : %s "), szUsernames[i]);
+
+		/* Do a case-insensitive search for all entries in szHostnames */
+		BOOL matched = FALSE;
+		if (0 == _tcsicmp(szUsernames[i], username)) {
+			matched = TRUE;
+		}
+
+		print_results(matched, msg);
+	}
+
+	free(username);
+}
+
+static TCHAR * get_netbios_hostname() {
+	TCHAR *hostname;
+	DWORD nSize = (MAX_COMPUTERNAME_LENGTH + 1);
+
+	hostname = (TCHAR *) malloc(nSize * sizeof(TCHAR));
+	if (!hostname) {
+		return NULL;
+	}
+	if (0 == GetComputerName(hostname, &nSize)) {
+		free(hostname);
+		return NULL;
+	}
+	return hostname;
+}
+
+static TCHAR * get_dns_hostname() {
+	TCHAR *hostname;
+	DWORD nSize = 0;
+
+	GetComputerNameEx(ComputerNameDnsHostname, NULL, &nSize);
+	hostname = (TCHAR *) malloc((nSize + 1) * sizeof(TCHAR));
+	if (!hostname) {
+		return NULL;
+	}
+	if (0 == GetComputerNameEx(ComputerNameDnsHostname, hostname, &nSize)) {
+		free(hostname);
+		return NULL;
+	}
+	return hostname;
+}
+
+/*
+Check for hostnames associated with sandboxes
+*/
+VOID known_hostnames() {
+
+	/* Array of strings of hostnames seen in sandboxes */
+	CONST TCHAR* szHostnames[] = {
+		/* Checked for by Gootkit
+		 * https://www.sentinelone.com/blog/gootkit-banking-trojan-deep-dive-anti-analysis-features/ */
+		_T("SANDBOX"),
+		_T("7SILVIA"),
+
+		/* Checked for by ostap
+		 * https://www.bromium.com/deobfuscating-ostap-trickbots-javascript-downloader/ */
+		_T("HANSPETER-PC"),
+		_T("JOHN-PC"),
+		_T("MUELLER-PC"),
+		_T("WIN7-TRAPS"),
+
+		/* Checked for by Shifu (not including ones from above)
+		 * https://www.mcafee.com/blogs/other-blogs/mcafee-labs/japanese-banking-trojan-shifu-combines-malware-tools */
+		_T("FORTINET"),
+
+		/* Checked for by Emotet (not including ones from above)
+		 * https://blog.trendmicro.com/trendlabs-security-intelligence/new-emotet-hijacks-windows-api-evades-sandbox-analysis/ */
+		_T("TEQUILABOOMBOOM"), /* VirusTotal Cuckoofork Sandbox */
+	};
+	TCHAR *NetBIOSHostName;
+	TCHAR *DNSHostName;
+
+	if (NULL == (NetBIOSHostName = get_netbios_hostname())) {
+		return;
+	}
+
+	if (NULL == (DNSHostName = get_dns_hostname())) {
+		free(NetBIOSHostName);
+		return;
+	}
+
+	TCHAR msg[256];
+	WORD dwlength = sizeof(szHostnames) / sizeof(szHostnames[0]);
+	for (int i = 0; i < dwlength; i++) {
+
+		_stprintf_s(msg, sizeof(msg) / sizeof(msg[0]), _T("Checking if hostname matches : %s "), szHostnames[i]);
+
+		/* Do a case-insensitive search for all entries in szHostnames */
+		BOOL matched = FALSE;
+		if (0 == _tcsicmp(szHostnames[i], NetBIOSHostName)) {
+			matched = TRUE;
+		}
+		else if (0 == _tcsicmp(szHostnames[i], DNSHostName)) {
+			matched = TRUE;
+		}
+
+		print_results(matched, msg);
+	}
+
+	free(NetBIOSHostName);
+	free(DNSHostName);
+}
+
+/*
+Check for a combination of environmental conditions, replicating what malware
+could/has used to detect that it's running in a sandbox. */
+VOID other_known_sandbox_environment_checks() {
+	TCHAR *NetBIOSHostName;
+	TCHAR *DNSHostName;
+	TCHAR *username;
+	BOOL matched;
+
+	if (NULL == (username = get_username())) {
+		return;
+	}
+	if (NULL == (NetBIOSHostName = get_netbios_hostname())) {
+		free(username);
+		return;
+	}
+
+	if (NULL == (DNSHostName = get_dns_hostname())) {
+		free(username);
+		free(NetBIOSHostName);
+		return;
+	}
+	/* From Emotet
+	 * https://blog.trendmicro.com/trendlabs-security-intelligence/new-emotet-hijacks-windows-api-evades-sandbox-analysis/ */
+
+	matched = FALSE;
+	if ((0 == StrCmp(username, _T("Wilber"))) &&
+		((0 == StrCmpNI(NetBIOSHostName, _T("SC"), 2)) ||
+	     (0 == StrCmpNI(NetBIOSHostName, _T("SW"), 2)))) {
+		matched = TRUE;
+	}
+	print_results(matched, (TCHAR *)_T("Checking whether username is 'Wilber' and NetBIOS name starts with 'SC' or 'SW' "));
+
+	matched = FALSE;
+	if ((0 == StrCmp(username, _T("admin"))) && (0 == StrCmp(NetBIOSHostName, _T("SystemIT")))) {
+		matched = TRUE;
+	}
+	print_results(matched, (TCHAR *)_T("Checking whether username is 'admin' and NetBIOS name is 'SystemIT' "));
+
+	matched = FALSE;
+	if ((0 == StrCmp(username, _T("admin"))) && (0 == StrCmp(DNSHostName, _T("KLONE_X64-PC")))) {
+		matched = TRUE;
+	}
+	print_results(matched, (TCHAR *) _T("Checking whether username is 'admin' and DNS hostname is 'KLONE_X64-PC' "));
+
+	matched = FALSE;
+	if ((0 == StrCmp(username, _T("John"))) &&
+		(is_FileExists((TCHAR *)_T("C:\\take_screenshot.ps1"))) &&
+		(is_FileExists((TCHAR *)_T("C:\\loaddll.exe")))) {
+		matched = TRUE;
+	}
+	print_results(matched, (TCHAR *)_T("Checking whether username is 'John' and two sandbox files exist "));
+
+	matched = FALSE;
+	if ((is_FileExists((TCHAR *)_T("C:\\email.doc"))) &&
+		(is_FileExists((TCHAR *)_T("C:\\email.htm"))) &&
+		(is_FileExists((TCHAR *)_T("C:\\123\\email.doc"))) &&
+		(is_FileExists((TCHAR *)_T("C:\\123\\email.docx")))) {
+		matched = TRUE;
+	}
+	print_results(matched, (TCHAR *)_T("Checking whether four known sandbox 'email' file paths exist "));
+
+	matched = FALSE;
+	if ((is_FileExists((TCHAR *)_T("C:\\a\\foobar.bmp"))) &&
+		(is_FileExists((TCHAR *)_T("C:\\a\\foobar.doc"))) &&
+		(is_FileExists((TCHAR *)_T("C:\\a\\foobar.gif")))) {
+		matched = TRUE;
+	}
+	print_results(matched, (TCHAR *)_T("Checking whether three known sandbox 'foobar' files exist "));
+
+	free(username);
+	free(NetBIOSHostName);
+	free(DNSHostName);
+}
+
 /*
 Detect Hybrid Analysis with mac vendor
 */
@@ -551,6 +853,40 @@ BOOL mouse_movement() {
 	else
 		return FALSE;
 }
+
+
+/*
+Check for the lack of user input.
+This version is slightly different from the original:
+https://www.lastline.com/labsblog/malware-evasion-techniques/
+It does not run inside an infinite loop (preventing al-khaser to get stuck)
+*/
+BOOL lack_user_input() {
+	int correct_idle_time_counter = 0;
+	DWORD current_tick_count = 0, idle_time = 0;
+	LASTINPUTINFO last_input_info; // Contains the time of the last input
+	last_input_info.cbSize = sizeof(LASTINPUTINFO);
+
+	for (int i = 0; i < 128; ++i) {
+		Sleep(0xb);
+		// Retrieves the time of the last input event
+		if (GetLastInputInfo(&last_input_info)) {
+			current_tick_count = GetTickCount();
+			if (current_tick_count < last_input_info.dwTime)
+				// impossible case unless GetTickCount is manipulated
+				return TRUE;
+			if (current_tick_count - last_input_info.dwTime < 100) {
+				correct_idle_time_counter++;
+				if (correct_idle_time_counter >= 10)
+					return FALSE;
+			}
+		}
+		else  // GetLastInputInfo must not fail
+			return TRUE;
+	}
+	return TRUE;
+}
+
 
 /*
 Check if the machine have enough memory space, usually VM get a small ammount,
@@ -1433,3 +1769,161 @@ BOOL cim_voltagesensor_wmi()
 	return FALSE;
 }
 
+/*
+Checks whether the specified application is a genuine Windows installation.
+
+*/
+
+#define WINDOWS_SLID                                                \
+            { 0x55c92734,                                           \
+              0xd682,                                               \
+              0x4d71,                                               \
+              { 0x98, 0x3e, 0xd6, 0xec, 0x3f, 0x16, 0x05, 0x9f }    \
+            }
+
+BOOL pirated_windows()
+{
+	CONST SLID AppId = WINDOWS_SLID;
+	SL_GENUINE_STATE GenuineState;
+	HRESULT hResult;
+
+	hResult = SLIsGenuineLocal(&AppId, &GenuineState, NULL);
+
+	if (hResult == S_OK) {
+		if (GenuineState != SL_GEN_STATE_IS_GENUINE) {
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+/* Check HKLM\System\CurrentControlSet\Services\Disk\Enum for values related
+ * to virtual machines. */
+BOOL registry_services_disk_enum()
+{
+	HKEY hkResult = NULL;
+	const TCHAR* diskEnumKey = _T("System\\CurrentControlSet\\Services\\Disk\\Enum");
+	DWORD diskCount = 0;
+	DWORD cbData = sizeof(diskCount);
+	const TCHAR* szChecks[] = {
+		/* Checked for by Smokeloader
+		 * https://research.checkpoint.com/2019-resurgence-of-smokeloader/*/
+		 _T("qemu"),
+		 _T("virtio"),
+		 _T("vmware"),
+		 _T("vbox"),
+		 _T("xen"),
+
+		 /* Checked for by Kutaki (not including ones from above)
+		 * https://cofense.com/kutaki-malware-bypasses-gateways-steal-users-credentials/ */
+		_T("VMW"),
+		_T("Virtual"),
+
+	};
+	WORD dwChecksLength = sizeof(szChecks) / sizeof(szChecks[0]);
+	BOOL bFound = FALSE;
+
+	/* Each disk has a corresponding value where the value name starts at '0' for
+	 * the first disk and increases by 1 for each subsequent disk.  The 'Count'
+	 * value appears to store the total number of disk entries.*/
+
+	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, diskEnumKey, NULL, KEY_READ, &hkResult) == ERROR_SUCCESS)
+	{
+		if (RegQueryValueEx(hkResult, _T("Count"), NULL, NULL, (LPBYTE)&diskCount, &cbData) != ERROR_SUCCESS)
+		{
+			RegCloseKey(hkResult);
+			return bFound;
+		}
+		RegCloseKey(hkResult);
+	}
+
+	for (unsigned int i = 0; i < diskCount; i++) {
+		TCHAR subkey[11];
+
+		_stprintf_s(subkey, sizeof(subkey) / sizeof(subkey[0]), _T("%d"), i);
+
+		for (unsigned int j = 0; j < dwChecksLength; j++) {
+			//_tprintf(_T("Checking %s %s for %s (%d)\n"), diskEnumKey, subkey, szChecks[j], diskCount);
+			if (Is_RegKeyValueExists(HKEY_LOCAL_MACHINE, diskEnumKey, subkey, szChecks[j])) {
+				bFound = TRUE;
+				break;
+			}
+		}
+		if (bFound) {
+			break;
+		}
+	}
+	return bFound;
+}
+
+BOOL registry_disk_enum()
+{
+	HKEY hkResult = NULL;
+	const TCHAR* szEntries[] = {
+		_T("System\\CurrentControlSet\\Enum\\IDE"),
+		_T("System\\CurrentControlSet\\Enum\\SCSI"),
+	};
+	const TCHAR* szChecks[] = {
+		/* Checked for by Smokeloader
+		 * https://research.checkpoint.com/2019-resurgence-of-smokeloader/*/
+		 _T("qemu"),
+		 _T("virtio"),
+		 _T("vmware"),
+		 _T("vbox"),
+		 _T("xen"),
+
+		 /* Checked for by Kutaki (not including ones from above)
+		 * https://cofense.com/kutaki-malware-bypasses-gateways-steal-users-credentials/ */
+		_T("VMW"),
+		_T("Virtual"),
+
+	};
+	WORD dwEntriesLength = sizeof(szEntries) / sizeof(szEntries[0]);
+	WORD dwChecksLength = sizeof(szChecks) / sizeof(szChecks[0]);
+	BOOL bFound = FALSE;
+
+	for (unsigned int i = 0; i < dwEntriesLength; i++) {
+		DWORD cSubKeys = 0;
+		DWORD cbMaxSubKeyLen = 0;
+		if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, szEntries[i], NULL, KEY_READ, &hkResult) != ERROR_SUCCESS) {
+			continue;
+		}
+
+		if (RegQueryInfoKey(hkResult, NULL, NULL, NULL, &cSubKeys, &cbMaxSubKeyLen, NULL, NULL, NULL, NULL, NULL, NULL) != ERROR_SUCCESS) {
+			RegCloseKey(hkResult);
+			continue;
+		}
+
+		DWORD subKeyBufferLen = (cbMaxSubKeyLen + 1) * sizeof(TCHAR);
+		TCHAR* subKeyBuffer = (TCHAR *)malloc(subKeyBufferLen);
+		if (!subKeyBuffer) {
+			RegCloseKey(hkResult);
+			continue;
+		}
+
+		for (unsigned int j = 0; j < cSubKeys; j++) {
+			DWORD cchName = subKeyBufferLen;
+			if (RegEnumKeyEx(hkResult, j, subKeyBuffer, &cchName, NULL, NULL, NULL, NULL) != ERROR_SUCCESS) {
+				continue;
+			}
+			for (unsigned int k = 0; k < dwChecksLength; k++) {
+				//_tprintf(_T("Checking %s %s for %s (%d)\n"), szEntries[i], subKeyBuffer, szChecks[k], cSubKeys);
+				if (StrStrI(subKeyBuffer, szChecks[k]) != NULL) {
+					bFound = TRUE;
+					break;
+				}
+			}
+			if (bFound) {
+				break;
+			}
+		}
+
+		free(subKeyBuffer);
+		RegCloseKey(hkResult);
+
+		if (bFound) {
+			break;
+		}
+	}
+	return bFound;
+}

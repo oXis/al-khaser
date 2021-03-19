@@ -1,4 +1,4 @@
-## Al-Khaser v0.79
+## Al-Khaser v0.80
 
 ![Logo](https://www.mindmeister.com/files/avatars/0035/8332/original/avatar.jpg)
 
@@ -49,6 +49,7 @@ Please, if you encounter any of the anti-analysis tricks which you have seen in 
 - Process Environment Block (NtGlobalFlag)
 - ProcessHeap (Flags)
 - ProcessHeap (ForceFlags)
+- Low Fragmentation Heap (LFH)
 - NtQueryInformationProcess (ProcessDebugPort)
 - NtQueryInformationProcess (ProcessDebugFlags)
 - NtQueryInformationProcess (ProcessDebugObject)
@@ -67,6 +68,7 @@ Please, if you encounter any of the anti-analysis tricks which you have seen in 
 - Memory Breakpoints (PAGE_GUARD)
 - Interrupt 0x2d
 - Interrupt 1
+- Trap Flag
 - Parent Process (Explorer.exe)
 - SeDebugPrivilege (Csrss.exe)
 - NtYieldExecution / SwitchToThread
@@ -110,6 +112,7 @@ Please, if you encounter any of the anti-analysis tricks which you have seen in 
 
 ### Human Interaction / Generic [Anti-Sandbox]
 - Mouse movement
+- File names like `sample.exe` or sandbox.exe`.
 - Total Physical memory (GlobalMemoryStatusEx)
 - Disk size using DeviceIoControl (IOCTL_DISK_GET_LENGTH_INFO)
 - Disk size using GetDiskFreeSpaceEx (TotalNumberOfBytes)
@@ -121,7 +124,8 @@ Please, if you encounter any of the anti-analysis tricks which you have seen in 
 - Sandbox known product IDs (todo)
 - Color of background pixel (todo)
 - Keyboard layout (Win32/Banload) (todo)
-
+- Genuine Windows installation.
+- Known Sandbox hostnames and usernames
 
 
 ### Anti-Virtualization / Full-System Emulation
@@ -150,6 +154,9 @@ Please, if you encounter any of the anti-analysis tricks which you have seen in 
   - SOFTWARE\\VMware, Inc.\\VMware Tools (VMWARE)
   - SOFTWARE\\Wine (WINE)
   - SOFTWARE\Microsoft\Virtual Machine\Guest\Parameters (HYPER-V)
+  - SYSTEM\\CurrentControlSet\\Services\\Disk\\Enum
+  - SYSTEM\\CurrentControlSet\\Enum\\IDE
+  - SYSTEM\\CurrentControlSet\\Enum\\SCSI
 - **File system artifacts**
   - "system32\\drivers\\VBoxMouse.sys"
   - "system32\\drivers\\VBoxGuest.sys"
@@ -313,7 +320,7 @@ Please, if you encounter any of the anti-analysis tricks which you have seen in 
 
 
 
-## Contributors
+## Authors
 - [mrexodia](http://mrexodia.cf): Main developer of [x64dbg](http://x64dbg.com/)
 - [Mattiwatti](https://github.com/Mattiwatti): Matthijs Lavrijsen
 - [gsuberland](https://twitter.com/gsuberland): Graham Sutherland

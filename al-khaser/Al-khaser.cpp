@@ -23,20 +23,21 @@ int main(void)
 	BOOL	ENABLE_DUMPING_CHECK = TRUE;
 	BOOL	ENABLE_ANALYSIS_TOOLS_CHECK = TRUE;
 	BOOL	ENABLE_ANTI_DISASSM_CHECKS = TRUE;
-
+	
 	/* Resize the console window for better visibility */
 	resize_console_window();
 
 	/* Display general informations */
-	_tprintf(_T("[al-khaser version 0.79]"));
-
-	if (IsWoW64())
-		_tprintf(_T("Process is running under WOW64\n\n"));
+	_tprintf(_T("[al-khaser version 0.80]"));
 
 	print_category(TEXT("Initialisation"));
 	API::Init();
 	print_os();
 	API::PrintAvailabilityReport();
+
+	/* Are we running under WoW64 */
+	if (IsWoW64())
+		_tprintf(_T("Process is running under WOW64\n\n"));
 
 	if (ENABLE_DEBUG_CHECKS) PageExceptionInitialEnum();
 
@@ -56,6 +57,7 @@ int main(void)
 		exec_check(&NtGlobalFlag, TEXT("Checking PEB.NtGlobalFlag "));
 		exec_check(&HeapFlags, TEXT("Checking ProcessHeap.Flags "));
 		exec_check(&HeapForceFlags, TEXT("Checking ProcessHeap.ForceFlags "));
+		exec_check(&LowFragmentationHeap, TEXT("Checking Low Fragmentation Heap"));
 		exec_check(&NtQueryInformationProcess_ProcessDebugPort, TEXT("Checking NtQueryInformationProcess with ProcessDebugPort "));
 		exec_check(&NtQueryInformationProcess_ProcessDebugFlags, TEXT("Checking NtQueryInformationProcess with ProcessDebugFlags "));
 		exec_check(&NtQueryInformationProcess_ProcessDebugObject, TEXT("Checking NtQueryInformationProcess with ProcessDebugObject "));
@@ -70,6 +72,7 @@ int main(void)
 		exec_check(&SoftwareBreakpoints, TEXT("Checking Software Breakpoints "));
 		exec_check(&Interrupt_0x2d, TEXT("Checking Interupt 0x2d "));
 		exec_check(&Interrupt_3, TEXT("Checking Interupt 1 "));
+		exec_check(&TrapFlag, TEXT("Checking trap flag"));
 		exec_check(&MemoryBreakpoints_PageGuard, TEXT("Checking Memory Breakpoints PAGE GUARD "));
 		exec_check(&IsParentExplorerExe, TEXT("Checking If Parent Process is explorer.exe "));
 		exec_check(&CanOpenCsrss, TEXT("Checking SeDebugPrivilege "));
@@ -104,6 +107,10 @@ int main(void)
 	if (ENABLE_GEN_SANDBOX_CHECKS) {
 		print_category(TEXT("Generic Sandboxe/VM Detection"));
 		loaded_dlls();
+		known_file_names();
+		known_usernames();
+		known_hostnames();
+		other_known_sandbox_environment_checks();
 		exec_check(&NumberOfProcessors, TEXT("Checking Number of processors in machine "));
 		exec_check(&idt_trick, TEXT("Checking Interupt Descriptor Table location "));
 		exec_check(&ldt_trick, TEXT("Checking Local Descriptor Table location "));
@@ -114,6 +121,7 @@ int main(void)
 		exec_check(&dizk_size_deviceiocontrol, TEXT("Checking hard disk size using DeviceIoControl "));
 		exec_check(&setupdi_diskdrive, TEXT("Checking SetupDi_diskdrive "));
 		exec_check(&mouse_movement, TEXT("Checking mouse movement "));
+		exec_check(&lack_user_input, TEXT("Checking lack of user input "));
 		exec_check(&memory_space, TEXT("Checking memory space using GlobalMemoryStatusEx "));
 		exec_check(&disk_size_getdiskfreespace, TEXT("Checking disk size using GetDiskFreeSpaceEx "));
 		exec_check(&cpuid_is_hypervisor, TEXT("Checking if CPU hypervisor field is set using cpuid(0x1)"));
@@ -143,6 +151,9 @@ int main(void)
 		exec_check(&cim_voltagesensor_wmi, TEXT("Checking CIM_VoltageSensor with WMI "));
 		exec_check(&cim_physicalconnector_wmi, TEXT("Checking CIM_PhysicalConnector with WMI "));
 		exec_check(&cim_slot_wmi, TEXT("Checking CIM_Slot with WMI "));
+		exec_check(&pirated_windows, TEXT("Checking if Windows is Genuine "));
+		exec_check(&registry_services_disk_enum, TEXT("Checking Services\\Disk\\Enum entries for VM strings "));
+		exec_check(&registry_disk_enum, TEXT("Checking Enum\\IDE and Enum\\SCSI entries for VM strings "));
 	}
 
 	/* VirtualBox Detection */
